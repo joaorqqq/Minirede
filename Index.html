@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Mini Rede Social Completa</title>
+<style>
+  body { font-family: Arial; margin: 20px; background: #f0f0f0; }
+  .post { border: 1px solid #ccc; padding: 5px; margin: 5px 0; background: #fff; }
+  .user { border: 1px solid #aaa; padding: 5px; margin: 5px 0; background: #eee; }
+  input, button { margin: 5px 0; }
+</style>
+</head>
+<body>
+<h1>Mini Rede Social</h1>
+
+<div id="loginDiv">
+  <h2>Login / Cadastro</h2>
+  <input id="loginName" placeholder="Nome de usuário">
+  <input id="loginDesc" placeholder="Descrição">
+  <button onclick="login()">Entrar / Cadastrar</button>
+</div>
+
+<div id="socialDiv" style="display:none;">
+  <h2>Bem-vindo <span id="currentUserName"></span>!</h2>
+  <button onclick="showEditProfile()">Editar Perfil</button>
+  
+  <div id="editProfileDiv" style="display:none;">
+    <h3>Editar Perfil</h3>
+    <input id="editName" placeholder="Novo nome">
+    <input id="editDesc" placeholder="Nova descrição">
+    <button onclick="editarPerfil()">Salvar</button>
+  </div>
+
+  <h3>Postar mensagem:</h3>
+  <input id="postMsg" placeholder="Escreva algo">
+  <button onclick="criarPost()">Postar</button>
+
+  <h3>Feed:</h3>
+  <div id="feed"></div>
+
+  <h3>Usuários:</h3>
+  <div id="usersList"></div>
+</div>
+
+<script>
+// Dados salvos no LocalStorage
+let users = JSON.parse(localStorage.getItem('users')) || [];
+let posts = JSON.parse(localStorage.getItem('posts')) || [];
+let currentUser = null;
+
+function salvar() {
+  localStorage.setItem('users', JSON.stringify(users));
+  localStorage.setItem('posts', JSON.stringify(posts));
+}
+
+// Login com ID automático
+function login() {
+  const username = document.getElementById('loginName').value.trim();
+  const desc = document.getElementById('loginDesc').value.trim();
+  
+  if(!username) { alert('Digite um nome de usuário'); return; }
+
+  // ID único automático
+  const newId = users.length + 1;
+  currentUser = {id: newId, username, desc, followers: [], following: []};
+  users.push(currentUser);
+
+  alert(`Usuário criado com ID: ${newId}`);
+  
+  document.getElementById('currentUserName').innerText = currentUser.username;
+  document.getElementById('loginDiv').style.display = 'none';
+  document.getElementById('socialDiv').style.display = 'block';
+  atualizarFeed();
+  atualizarUsers();
+  salvar();
+}
+
+// Criar post
+function criarPost() {
+  const msg = document.getElementById('postMsg').value.trim();
+  if(!msg) { alert('Escreva uma mensagem'); return; }
+  const id = posts.length + 1;
+  posts.push({id, userId: currentUser.id, message: msg, timestamp: Date.now()});
+  salvar();
+  atualizarFeed();
+}
+
+// Atualizar feed
+function atualizarFeed() {
+  const feed = document.getElementById('feed');
+  feed.innerHTML = '';
+  const feedPosts = posts.filter(p => currentUser.following.includes(p.userId) || p.userId === currentUser.id);
+  feedPosts.sort((a,b) => b.timestamp - a.timestamp);
+  feedPosts.forEach(p => {
+    const user = users.find(u => u.id === p.userId);
+    const date = new Date(p.timestamp).toLocaleString();
+    feed.innerHTML += `<div class="post"><b>${user.username}</b> (${date}):<br>${p.message}</div>`;
+  });
+}
+
+// Atualizar lista de usuários
+function atualizarUsers() {
+  const listDiv = document.getElementById('usersList');
+  listDiv.innerHTML = '';
+  users.forEach(u => {
+    if(u.id === currentUser.id) return;
+    const isFollowing = currentUser.following.includes(u.id);
+    const btnText = isFollowing ? 'Deixar de seguir' : 'Seguir';
+    listDiv.innerHTML += `<div class="user"><b>${u.username}</b> - ${u.desc} 
+      <button onclick="toggleFollow(${u.id})">${btnText}</button></div>`;
+  });
+}
+
+// Seguir / deixar de seguir
+function toggleFollow(userId) {
+  if(currentUser.following.includes(userId)) {
+    currentUser.following = currentUser.following.filter(id => id !== userId);
+  } else {
+    currentUser.following.push(userId);
+  }
+  salvar();
+  atualizarUsers();
+  atualizarFeed();
+}
+
+// Mostrar / editar perfil
+function showEditProfile() {
+  document.getElementById('editProfileDiv').style.display = 'block';
+  document.getElementById('editName').value = currentUser.username;
+  document.getElementById('editDesc').value = currentUser.desc;
+}
+
+function editarPerfil() {
+  const newName = document.getElementById('editName').value.trim();
+  const newDesc = document.getElementById('editDesc').value.trim();
+  if(!newName) { alert('Nome não pode ficar vazio'); return; }
+  currentUser.username = newName;
+  currentUser.desc = newDesc;
+  salvar();
+  document.getElementById('currentUserName').innerText = currentUser.username;
+  document.getElementById('editProfileDiv').style.display = 'none';
+  atualizarUsers();
+  atualizarFeed();
+}
+
+// API para Pocket Code
+window.api = {
+  getUsers: () => JSON.stringify(users),
+  getPosts: () => JSON.stringify(posts.filter(p => currentUser.following.includes(p.userId) || p.userId === currentUser.id)),
+  postMessage: (message) => {
+    const id = posts.length + 1;
+    posts.push({id, userId: currentUser.id, message, timestamp: Date.now()});
+    salvar();
+    atualizarFeed();
+    return JSON.stringify({success:true});
+  },
+  follow: (followId) => {
+    if(!currentUser.following.includes(followId)) currentUser.following.push(followId);
+    salvar();
+    atualizarUsers();
+    atualizarFeed();
+    return JSON.stringify({success:true});
+  }
+};
+</script>
+</body>
+</html>

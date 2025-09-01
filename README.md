@@ -1,2 +1,0 @@
-# Minirede
-Alfredo
